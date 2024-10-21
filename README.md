@@ -1,7 +1,7 @@
 # Alumnes API - Proyecto FastAPI
 
 # Introducción
-Este proyecto es un ejercicio práctico que tiene como objetivo desarrollar una API para la gestión de registros de alumnos utilizando FastAPI y MariaDB. El proyecto se divide en tres partes principales:
+Este proyecto es un ejercicio práctico que tiene como objetivo desarrollar una API para la gestión de registros de alumnos utilizando FastAPI y HeidiSQL. El proyecto se divide en tres partes principales:
 
 1. Mostrar los datos de los alumnos en una página web utilizando llamadas a la API.
 2. Implementar funcionalidades avanzadas de consulta para filtrar, ordenar y paginar los resultados.
@@ -12,7 +12,6 @@ Este proyecto es un ejercicio práctico que tiene como objetivo desarrollar una 
 2. FastAPI
 3. Uvicorn
 4. Conector HeidiSQL/MySQL
-5. Conocimientos básicos de JavaScript para realizar llamadas a la API desde el frontend
 
 # Estructura del Proyecto
 ````
@@ -43,9 +42,14 @@ En el frontend, usamos JavaScript para realizar una solicitud fetch al endpoint 
 
 En el lado del servidor, creamos un endpoint de la API que obtiene los datos de los alumnos desde la base de datos y los devuelve en formato JSON. Estos datos incluyen el nombre del alumno, el ciclo, el curso, el grupo y el aula. También utilizamos middleware CORS para permitir la comunicación entre el frontend y el backend.
 
+Captura de la web:
+
+![alt text](image.png)
+
 # Parte 2: Consultas Avanzadas
 
 Esta parte se centra en ampliar la funcionalidad de la API agregando parámetros de consulta (query parameters) para filtrar, ordenar y paginar los datos de los alumnos. El endpoint /alumnes/list acepta los siguientes parámetros:
+
 ````
 a) orderby: Permite ordenar los resultados por nombre de alumno, ya sea en orden ascendente (asc) o descendente (desc).
 b) contain: Filtra los resultados por una cadena de texto que el nombre del alumno debe contener.

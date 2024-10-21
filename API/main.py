@@ -1,8 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from client import get_db_connection
 from alumne import Alumne, AlumneDetails
+import csv
+from io import StringIO
 
 app = FastAPI()
 
@@ -14,6 +16,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+def alumne_schema(fetchAlumnes):
+    return {
+        "NomAlumne": fetchAlumnes[0],
+        "Cicle": fetchAlumnes[1],
+        "Curs": fetchAlumnes[2],
+        "Grup": fetchAlumnes[3],
+        "DescAula": fetchAlumnes[4]
+    }
 
 @app.get("/alumne/list")
 def list_alumnes():
@@ -158,3 +169,90 @@ def list_all():
     conn.close()
     
     return alumnes
+
+@app.get("/alumnes/list", response_model=List[AlumneDetails])
+def read_alumnes(orderby: Optional[str] = None, contain: Optional[str] = None, skip: int = 0, limit: Optional[int] = None):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    query = """
+    SELECT Alumne.NomAlumne, Alumne.Cicle, Alumne.Curs, Alumne.Grup, Aula.DescAula
+    FROM Alumne
+    JOIN Aula ON Alumne.IdAula = Aula.IdAula
+    """
+    
+    # Aplicar filtro 'contain'
+    if contain:
+        query += " WHERE Alumne.NomAlumne LIKE %s"
+        contain_value = f"%{contain}%"
+    else:
+        contain_value = None
+
+    # Aplicar orden 'orderby'
+    if orderby and orderby.lower() in ["asc", "desc"]:
+        query += f" ORDER BY Alumne.NomAlumne {orderby.upper()}"
+
+    # Aplicar paginación
+    if limit is not None:
+        query += f" LIMIT {limit} OFFSET {skip}"
+    
+    # Ejecutar la consulta
+    cursor.execute(query, (contain_value,) if contain_value else None)
+    alumnes = cursor.fetchall()
+
+    # Convertir los datos usando alumne_schema
+    alumnes_formatted = [alumne_schema(alumne) for alumne in alumnes]
+    
+    cursor.close()
+    conn.close()
+    
+    return alumnes_formatted
+
+@app.post("/alumne/loadAlumnes")
+async def load_alumnes(file: UploadFile = File(...)):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    content = await file.read()
+    csv_data = StringIO(content.decode("utf-8"))
+    csv_reader = csv.reader(csv_data)
+
+    for row in csv_reader:
+        if row[0].lower() == "DescAula":  # Saltar la fila del encabezado si existe
+            continue
+        
+        desc_aula, edifici, pis, nom_alumne, cicle, curs, grup = row
+        
+        # Verificar si el Aula existe
+        cursor.execute("SELECT * FROM Aula WHERE DescAula = %s", (desc_aula,))
+        aula = cursor.fetchone()
+        if not aula:
+            # Insertar en la tabla Aula si no existe
+            cursor.execute("""
+                INSERT INTO Aula (DescAula, Edifici, Pis, CreatedAt, UpdatedAt)
+                VALUES (%s, %s, %s, NOW(), NOW())
+            """, (desc_aula, edifici, pis))
+            conn.commit()
+
+        # Obtener el IdAula para insertar Alumne
+        cursor.execute("SELECT IdAula FROM Aula WHERE DescAula = %s", (desc_aula,))
+        aula_id = cursor.fetchone()['IdAula']
+
+        # Verificar si el Alumne ya existe
+        cursor.execute("""
+            SELECT * FROM Alumne WHERE NomAlumne = %s AND Cicle = %s AND Curs = %s AND Grup = %s
+        """, (nom_alumne, cicle, curs, grup))
+        alumne = cursor.fetchone()
+
+        if not alumne:
+            # Insertar Alumne si no existe
+            cursor.execute("""
+                INSERT INTO Alumne (IdAula, NomAlumne, Cicle, Curs, Grup, CreatedAt, UpdatedAt)
+                VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+            """, (aula_id, nom_alumne, cicle, curs, grup))
+            conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return {"message": "Càrrega massiva completada correctament."}

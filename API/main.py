@@ -1,11 +1,12 @@
-import mysql.connector
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional
+from typing import List, Optional
+from client import get_db_connection
+from alumne import Alumne, AlumneDetails
 
 app = FastAPI()
 
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  
@@ -14,26 +15,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-def get_db_connection():
-    connection = mysql.connector.connect(
-        host="127.0.0.1",
-        user="root",
-        password="1234",
-        database="Alumnat",
-        charset='utf8mb4',
-        collation='utf8mb4_general_ci'
-    )
-    return connection
-
-class Alumne(BaseModel):
-    idAula: int
-    nomAlumne: str
-    cicle: str
-    curs: int
-    grup: str
-
-    
 @app.get("/alumne/list")
 def list_alumnes():
     conn = get_db_connection()
@@ -151,6 +132,25 @@ def list_all():
     JOIN Aula ON Alumne.IdAula = Aula.IdAula
     """
     
+    cursor.execute(query)
+    alumnes = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    
+    return alumnes
+
+@app.get("/alumne/listAll", response_model=List[AlumneDetails])
+def list_all():
+    """List only necessary fields of students with their classroom information."""
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    query = """
+    SELECT Alumne.NomAlumne, Alumne.Cicle, Alumne.Curs, Alumne.Grup, Aula.DescAula
+    FROM Alumne
+    JOIN Aula ON Alumne.IdAula = Aula.IdAula
+    """
     cursor.execute(query)
     alumnes = cursor.fetchall()
     
